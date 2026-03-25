@@ -48,6 +48,15 @@ func getDefaultAPIURL() string {
 	return "https://mcp.pipeboard.co"
 }
 
+// getWebAPIURL returns the base URL for Pipeboard web API endpoints (not MCP).
+// Debug and other REST endpoints live on the main domain, not on the MCP subdomain.
+func getWebAPIURL() string {
+	if url := os.Getenv("PIPEBOARD_WEB_URL"); url != "" {
+		return url
+	}
+	return "https://pipeboard.co"
+}
+
 func getToken() (string, error) {
 	// 1. Check environment variable
 	if token := os.Getenv("PIPEBOARD_API_TOKEN"); token != "" {
