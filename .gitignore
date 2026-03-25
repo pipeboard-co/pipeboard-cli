@@ -29,6 +29,8 @@ go.work.sum
 
 # Build output
 bin/
+pipeboard
+pipeboard.exe
 
 # Conductor workspace
 .context/
