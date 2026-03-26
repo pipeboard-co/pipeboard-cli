@@ -39,6 +39,7 @@ func init() {
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(debugCmd)
+	rootCmd.AddCommand(mcpCmd)
 }
 
 func getDefaultAPIURL() string {
