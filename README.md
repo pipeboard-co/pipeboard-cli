@@ -1,8 +1,8 @@
 # pipeboard-cli
 
-Command-line tool for managing Meta Ads, Google Ads, and TikTok Ads from your terminal. Create campaigns, pull reports, and manage ads across platforms with a single CLI.
+Command-line tool for managing Meta Ads, Google Ads, and TikTok Ads from your terminal. Built for AI agents and automation — authenticate once, connect your ad platforms via OAuth, and let your agents manage campaigns, pull reports, and optimize ads across platforms.
 
-All operations go through [Pipeboard](https://pipeboard.co) servers — no direct API calls to ad platforms, no credentials stored locally.
+Works as an alternative to [Pipeboard](https://pipeboard.co)'s MCP servers for agents that prefer CLI tools. Pipeboard gives you control over which ad accounts the CLI can access, and you can create API tokens scoped to specific accounts and commands.
 
 ## Installation
 
