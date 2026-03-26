@@ -44,20 +44,42 @@ Get your API token at [pipeboard.co/settings](https://pipeboard.co/settings).
 pipeboard login
 ```
 
+## Quick Start
+
+After authenticating, fetch the available tools:
+
+```bash
+pipeboard refresh
+```
+
+This downloads tool definitions from Pipeboard's MCP servers and caches them locally at `~/.pipeboard/tools-cache.json`. Run this once after install, or again when new tools are available.
+
 ## Usage
 
-Commands are auto-generated from Pipeboard's MCP tool definitions. Run `pipeboard --help` to see available commands.
+Commands are auto-generated from Pipeboard's MCP tool definitions. Each ad platform is a top-level command with subcommands for every available operation.
 
 ```bash
 # List Google Ads campaigns
-pipeboard google-ads list-campaigns --customer-id 1234567890
+pipeboard google-ads get-campaigns --customer-id 1234567890
 
-# Get Meta Ads insights
-pipeboard meta-ads get-insights --account-id act_123 --date-range last_30d
+# Execute a raw GAQL query
+pipeboard google-ads execute-gaql-query --customer-id 1234567890 --query "SELECT campaign.id, campaign.name FROM campaign LIMIT 10"
+
+# Get Meta Ads campaign insights
+pipeboard meta-ads get-insights --object-id act_123 --date-preset last_30d
+
+# Create a Meta Ads campaign
+pipeboard meta-ads create-campaign --account-id act_123 --name "Spring Sale" --objective OUTCOME_SALES
+
+# See all available commands for a platform
+pipeboard google-ads --help
+pipeboard meta-ads --help
 
 # Check version
 pipeboard version
 ```
+
+Flags are generated from each tool's JSON Schema — required flags are enforced and enum values are shown in help text.
 
 ## Development
 
