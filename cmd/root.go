@@ -40,6 +40,11 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(mcpCmd)
+	rootCmd.AddCommand(refreshCmd)
+
+	// Load cached tool definitions and register dynamic platform commands
+	// (e.g. pipeboard google-ads get-campaigns, pipeboard meta-ads get-ads)
+	registerDynamicCommands()
 }
 
 func getDefaultAPIURL() string {
