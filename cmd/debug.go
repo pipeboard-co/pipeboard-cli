@@ -30,18 +30,20 @@ Examples:
 }
 
 var (
-	debugMetaPath   string
-	debugMetaMethod string
-	debugMetaParams string
-	debugMetaPageID string
+	debugMetaPath        string
+	debugMetaMethod      string
+	debugMetaParams      string
+	debugMetaPageID      string
+	debugMetaAdAccountID string
 )
 
 func init() {
 	// Meta Ads debug
 	debugMetaAdsCmd.Flags().StringVar(&debugMetaPath, "path", "", "Graph API path, e.g. me/adaccounts or act_123/campaigns (required)")
-	debugMetaAdsCmd.Flags().StringVar(&debugMetaMethod, "method", "GET", "HTTP method: GET or POST")
+	debugMetaAdsCmd.Flags().StringVar(&debugMetaMethod, "method", "GET", "HTTP method: GET, POST, or DELETE")
 	debugMetaAdsCmd.Flags().StringVar(&debugMetaParams, "params", "", "JSON object of additional query/body params")
 	debugMetaAdsCmd.Flags().StringVar(&debugMetaPageID, "page-id", "", "Use this page's access token instead of user token")
+	debugMetaAdsCmd.Flags().StringVar(&debugMetaAdAccountID, "ad-account-id", "", "Explicit ad account ID for token resolution (e.g. act_123456)")
 	debugMetaAdsCmd.MarkFlagRequired("path")
 	debugCmd.AddCommand(debugMetaAdsCmd)
 
@@ -125,6 +127,9 @@ func runDebugMetaAds(cmd *cobra.Command, args []string) error {
 	}
 	if debugMetaPageID != "" {
 		body["page_id"] = debugMetaPageID
+	}
+	if debugMetaAdAccountID != "" {
+		body["ad_account_id"] = debugMetaAdAccountID
 	}
 
 	c := client.NewREST(getWebAPIURL(), token)
