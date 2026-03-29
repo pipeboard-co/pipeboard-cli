@@ -4,12 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/pipeboard-co/pipeboard-cli/internal/client"
 	"github.com/spf13/cobra"
 )
+
+const autoRefreshInterval = 1 * time.Hour
 
 // registerDynamicCommands loads the tools cache and registers platform commands.
 func registerDynamicCommands() {
@@ -36,6 +41,52 @@ func registerDynamicCommands() {
 
 		rootCmd.AddCommand(platformCmd)
 	}
+
+	// Check for tool updates in the background
+	maybeAutoRefresh(cache)
+}
+
+// maybeAutoRefresh checks whether the tools cache is stale and, if so,
+// spawns a detached background process to check the hash and refresh if
+// needed. The current command always uses the existing cache; updates
+// take effect on the next invocation.
+func maybeAutoRefresh(cache *ToolsCache) {
+	if time.Since(cache.LastCheckedAt) < autoRefreshInterval {
+		return
+	}
+
+	// Spawn a detached "pipeboard refresh --if-changed" subprocess.
+	// It survives parent exit and writes the cache for the next run.
+	self, err := os.Executable()
+	if err != nil {
+		return
+	}
+	cmd := exec.Command(self, "refresh", "--if-changed")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Stdout = nil
+	cmd.Stderr = nil
+	_ = cmd.Start()
+}
+
+// runAutoRefresh is the implementation behind "refresh --if-changed".
+// It checks the hash first and only does a full refresh if tools changed.
+func runAutoRefresh(baseURL, token string) error {
+	cache, _ := loadToolsCache()
+
+	hashResult, err := client.FetchToolsHash(baseURL)
+	if err != nil {
+		return err
+	}
+
+	if cache != nil && hashResult.Hash == cache.Hash {
+		// Tools unchanged — just bump the check timestamp
+		cache.LastCheckedAt = time.Now()
+		return saveToolsCache(cache)
+	}
+
+	// Hash changed or no cache — do a full refresh
+	_, err = fetchAndCacheTools(baseURL, token, false)
+	return err
 }
 
 // toolNameToCommandName converts an MCP tool name to a CLI command name.
