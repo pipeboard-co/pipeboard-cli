@@ -11,8 +11,10 @@ import (
 
 // ToolsCache stores tool definitions fetched from MCP servers.
 type ToolsCache struct {
-	Servers   map[string]ServerToolsCache `json:"servers"`
-	UpdatedAt time.Time                   `json:"updated_at"`
+	Servers       map[string]ServerToolsCache `json:"servers"`
+	UpdatedAt     time.Time                   `json:"updated_at"`
+	Hash          string                      `json:"hash,omitempty"`
+	LastCheckedAt time.Time                   `json:"last_checked_at,omitempty"`
 }
 
 // ServerToolsCache holds the tools for a single MCP server.
