@@ -165,6 +165,32 @@ func (c *Client) call(serverPath, method string, params interface{}) (json.RawMe
 	return rpcResp.Result, nil
 }
 
+// ToolsHashResult is the response from GET /tools-hash.
+type ToolsHashResult struct {
+	Hash string `json:"hash"`
+}
+
+// FetchToolsHash retrieves the combined tools hash from the server.
+// baseURL is the MCP base URL (e.g. https://mcp.pipeboard.co).
+// This endpoint requires no authentication.
+func FetchToolsHash(baseURL string) (*ToolsHashResult, error) {
+	resp, err := http.Get(baseURL + "/api/tools-hash")
+	if err != nil {
+		return nil, fmt.Errorf("fetching tools hash: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("tools-hash HTTP %d", resp.StatusCode)
+	}
+
+	var result ToolsHashResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("parsing tools-hash: %w", err)
+	}
+	return &result, nil
+}
+
 func (c *Client) notify(serverPath, method string, params interface{}) error {
 	// Notifications have no ID and expect no response.
 	type notification struct {
