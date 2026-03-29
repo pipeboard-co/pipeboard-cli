@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/pipeboard-co/pipeboard-cli/internal/client"
@@ -69,7 +68,7 @@ func maybeAutoRefresh(cache *ToolsCache) {
 	}
 	cmd := exec.Command(self, "refresh", "--if-changed")
 	cmd.Env = append(os.Environ(), "PIPEBOARD_AUTO_REFRESH=1")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setSysProcAttr(cmd)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	_ = cmd.Start()
