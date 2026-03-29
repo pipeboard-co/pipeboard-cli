@@ -61,7 +61,7 @@ func newMCPClient() (*client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return client.New(apiURL, token), nil
+	return client.New(apiURL, token, Version), nil
 }
 
 func runMCPToolsList(cmd *cobra.Command, args []string) error {

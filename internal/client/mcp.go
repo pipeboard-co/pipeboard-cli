@@ -14,15 +14,20 @@ import (
 type Client struct {
 	baseURL    string
 	token      string
+	version    string
+	userAgent  string
 	httpClient *http.Client
 	reqID      atomic.Int64
 }
 
-// New creates an MCP client.
-func New(baseURL, token string) *Client {
+// New creates an MCP client. version is used in the User-Agent header
+// and the MCP clientInfo.
+func New(baseURL, token, version string) *Client {
 	return &Client{
 		baseURL:    baseURL,
 		token:      token,
+		version:    version,
+		userAgent:  "pipeboard-cli/" + version,
 		httpClient: &http.Client{},
 	}
 }
@@ -71,7 +76,7 @@ func (c *Client) Initialize(serverPath string) error {
 		"capabilities":    map[string]interface{}{},
 		"clientInfo": map[string]string{
 			"name":    "pipeboard-cli",
-			"version": "0.1.0",
+			"version": c.version,
 		},
 	}
 
@@ -137,6 +142,7 @@ func (c *Client) call(serverPath, method string, params interface{}) (json.RawMe
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.token)
+	httpReq.Header.Set("User-Agent", c.userAgent)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -218,6 +224,7 @@ func (c *Client) notify(serverPath, method string, params interface{}) error {
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+c.token)
+	httpReq.Header.Set("User-Agent", c.userAgent)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {

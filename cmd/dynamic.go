@@ -195,7 +195,7 @@ func runDynamicTool(server ServerConfig, toolName string, schema InputSchema, st
 		return err
 	}
 
-	c := client.New(apiURL, token)
+	c := client.New(apiURL, token, Version)
 
 	fmt.Fprintf(os.Stderr, "Connecting to %s/%s...\n", apiURL, server.Path)
 	if err := c.Initialize(server.Path); err != nil {
