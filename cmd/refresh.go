@@ -55,7 +55,7 @@ func runRefresh(cmd *cobra.Command, args []string) error {
 // fetchAndCacheTools fetches tools from all servers and saves the cache.
 // If verbose is true, progress is printed to stderr.
 func fetchAndCacheTools(baseURL, token string, verbose bool) (*ToolsCache, error) {
-	c := client.New(baseURL, token)
+	c := client.New(baseURL, token, Version)
 	cache := &ToolsCache{
 		Servers:       make(map[string]ServerToolsCache),
 		UpdatedAt:     time.Now(),

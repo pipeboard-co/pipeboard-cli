@@ -248,7 +248,7 @@ func newGoogleAdsMCPClient() (*client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := client.New(apiURL, token)
+	c := client.New(apiURL, token, Version)
 	fmt.Fprintf(os.Stderr, "Connecting to %s/%s...\n", apiURL, googleAdsMCPServer)
 	if err := c.Initialize(googleAdsMCPServer); err != nil {
 		return nil, fmt.Errorf("MCP handshake failed: %w", err)
