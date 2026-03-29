@@ -51,6 +51,12 @@ func registerDynamicCommands() {
 // needed. The current command always uses the existing cache; updates
 // take effect on the next invocation.
 func maybeAutoRefresh(cache *ToolsCache) {
+	// Guard against recursive spawning: the child sets this env var so
+	// it won't spawn another child during its own init().
+	if os.Getenv("PIPEBOARD_AUTO_REFRESH") == "1" {
+		return
+	}
+
 	if time.Since(cache.LastCheckedAt) < autoRefreshInterval {
 		return
 	}
@@ -62,6 +68,7 @@ func maybeAutoRefresh(cache *ToolsCache) {
 		return
 	}
 	cmd := exec.Command(self, "refresh", "--if-changed")
+	cmd.Env = append(os.Environ(), "PIPEBOARD_AUTO_REFRESH=1")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Stdout = nil
 	cmd.Stderr = nil
