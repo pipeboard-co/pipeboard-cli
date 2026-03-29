@@ -2,9 +2,7 @@
 
 Manage Meta Ads and Google Ads from your terminal. Single binary, zero dependencies, 50ms startup.
 
-Built for AI coding agents (Claude Code, Cline, OpenClaw) and automation scripts that prefer `pipeboard meta-ads get-insights ...` over JSON-RPC. Every CLI invocation goes through [Pipeboard](https://pipeboard.co)'s cloud — your ad platform tokens never touch the local machine.
-
-Commands are generated dynamically from Pipeboard's MCP tool definitions. When new tools ship server-side, they're available in the CLI automatically — no release required.
+Built for AI coding agents (Claude Code, Cline, OpenClaw) and automation scripts. No need to register apps with each ad platform, run your own MCP servers, or maintain brittle API scripts — authenticate once with [Pipeboard](https://pipeboard.co) and go.
 
 ## Why use the CLI
 
