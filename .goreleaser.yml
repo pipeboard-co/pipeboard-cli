@@ -1,5 +1,7 @@
 version: 2
 
+project_name: pipeboard
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -23,7 +25,8 @@ archives:
         format: zip
 
 brews:
-  - repository:
+  - name: pipeboard
+    repository:
       owner: pipeboard-co
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
