@@ -89,7 +89,7 @@ func fetchAndCacheTools(baseURL, token string, verbose bool) (*ToolsCache, error
 	}
 
 	// Fetch and store the current hash
-	if hashResult, err := client.FetchToolsHash(baseURL); err == nil {
+	if hashResult, err := client.FetchToolsHash(baseURL, Version); err == nil {
 		cache.Hash = hashResult.Hash
 	}
 

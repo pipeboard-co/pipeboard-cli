@@ -132,7 +132,7 @@ func runDebugMetaAds(cmd *cobra.Command, args []string) error {
 		body["ad_account_id"] = debugMetaAdAccountID
 	}
 
-	c := client.NewREST(getWebAPIURL(), token)
+	c := client.NewREST(getWebAPIURL(), token, Version)
 	result, err := c.Post("/api/debug/meta-ads", body)
 	if err != nil {
 		return fmt.Errorf("debug query failed: %w", err)
