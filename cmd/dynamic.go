@@ -79,7 +79,7 @@ func maybeAutoRefresh(cache *ToolsCache) {
 func runAutoRefresh(baseURL, token string) error {
 	cache, _ := loadToolsCache()
 
-	hashResult, err := client.FetchToolsHash(baseURL)
+	hashResult, err := client.FetchToolsHash(baseURL, Version)
 	if err != nil {
 		return err
 	}

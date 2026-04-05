@@ -179,8 +179,14 @@ type ToolsHashResult struct {
 // FetchToolsHash retrieves the combined tools hash from the server.
 // baseURL is the MCP base URL (e.g. https://mcp.pipeboard.co).
 // This endpoint requires no authentication.
-func FetchToolsHash(baseURL string) (*ToolsHashResult, error) {
-	resp, err := http.Get(baseURL + "/api/tools-hash")
+func FetchToolsHash(baseURL, version string) (*ToolsHashResult, error) {
+	req, err := http.NewRequest("GET", baseURL+"/api/tools-hash", nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("User-Agent", "pipeboard-cli/"+version)
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching tools hash: %w", err)
 	}

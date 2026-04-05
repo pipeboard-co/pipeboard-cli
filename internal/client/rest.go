@@ -12,14 +12,16 @@ import (
 type RESTClient struct {
 	baseURL    string
 	token      string
+	userAgent  string
 	httpClient *http.Client
 }
 
-// NewREST creates a REST API client.
-func NewREST(baseURL, token string) *RESTClient {
+// NewREST creates a REST API client. version is used in the User-Agent header.
+func NewREST(baseURL, token, version string) *RESTClient {
 	return &RESTClient{
 		baseURL:    baseURL,
 		token:      token,
+		userAgent:  "pipeboard-cli/" + version,
 		httpClient: &http.Client{},
 	}
 }
@@ -39,6 +41,7 @@ func (c *RESTClient) Post(path string, body interface{}) (map[string]interface{}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("User-Agent", c.userAgent)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
