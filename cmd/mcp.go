@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/pipeboard-co/pipeboard-cli/internal/client"
@@ -167,6 +168,28 @@ func runMCPToolsCall(cmd *cobra.Command, args []string) error {
 		return emitJSONError(fmt.Errorf("tool call failed: %w", err))
 	}
 
+	if isToolNotFound(result) {
+		if !mcpJSON {
+			fmt.Fprintf(os.Stderr, "Tool not found; refreshing tool list and retrying...\n")
+		}
+		tools, listErr := c.ListTools(mcpServer)
+		if listErr != nil {
+			return emitJSONError(fmt.Errorf("tool not found and tools/list failed: %w", listErr))
+		}
+		if toolExists(tools.Tools, mcpToolName) {
+			result, err = c.CallTool(mcpServer, mcpToolName, toolArgs)
+			if err != nil {
+				return emitJSONError(fmt.Errorf("tool call failed: %w", err))
+			}
+		} else {
+			msg := fmt.Sprintf("tool %q not found on server %q", mcpToolName, mcpServer)
+			if suggestions := similarTools(tools.Tools, mcpToolName, 5); len(suggestions) > 0 {
+				msg += " (did you mean: " + strings.Join(suggestions, ", ") + "?)"
+			}
+			return emitJSONError(fmt.Errorf("%s", msg))
+		}
+	}
+
 	if mcpJSON {
 		return emitToolResultJSON(result)
 	}
@@ -252,6 +275,69 @@ func emitToolResultJSON(raw json.RawMessage) error {
 	}
 
 	return emitJSON(out)
+}
+
+// isToolNotFound reports whether a tools/call result is an isError envelope
+// whose text begins with "Tool not found". That signal is what triggers an
+// implicit tools/list refresh and one retry.
+func isToolNotFound(raw json.RawMessage) bool {
+	var env struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+		IsError bool `json:"isError"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return false
+	}
+	if !env.IsError || len(env.Content) == 0 {
+		return false
+	}
+	return strings.HasPrefix(env.Content[0].Text, "Tool not found")
+}
+
+func toolExists(tools []client.ToolDefinition, name string) bool {
+	for _, t := range tools {
+		if t.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// similarTools returns up to max tool names that share underscore-separated
+// tokens with name, ranked by shared-token count. Used to produce a
+// "did you mean" hint when a tool is genuinely missing.
+func similarTools(tools []client.ToolDefinition, name string, max int) []string {
+	tokens := strings.Split(strings.ToLower(name), "_")
+	type scored struct {
+		name  string
+		score int
+	}
+	var candidates []scored
+	for _, t := range tools {
+		lower := strings.ToLower(t.Name)
+		score := 0
+		for _, tok := range tokens {
+			if len(tok) > 1 && strings.Contains(lower, tok) {
+				score++
+			}
+		}
+		if score > 0 {
+			candidates = append(candidates, scored{t.Name, score})
+		}
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		return candidates[i].score > candidates[j].score
+	})
+	if len(candidates) > max {
+		candidates = candidates[:max]
+	}
+	out := make([]string, len(candidates))
+	for i, c := range candidates {
+		out[i] = c.name
+	}
+	return out
 }
 
 func truncate(s string, max int) string {

@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"testing"
+
+	"github.com/pipeboard-co/pipeboard-cli/internal/client"
 )
 
 // captureStdout runs fn with os.Stdout redirected to a pipe and returns the
@@ -122,6 +124,43 @@ func TestEmitToolResultJSON_PassthroughWhenNotEnvelope(t *testing.T) {
 	}
 	if data["foo"] != "bar" {
 		t.Errorf("data.foo = %v, want bar", data["foo"])
+	}
+}
+
+func TestIsToolNotFound(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{"tool not found envelope", `{"content":[{"type":"text","text":"Tool not found: foo"}],"isError":true}`, true},
+		{"isError but different message", `{"content":[{"type":"text","text":"auth expired"}],"isError":true}`, false},
+		{"not an error", `{"content":[{"type":"text","text":"Tool not found: foo"}],"isError":false}`, false},
+		{"no content", `{"content":[],"isError":true}`, false},
+		{"garbage", `not json`, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isToolNotFound(json.RawMessage(tt.raw)); got != tt.want {
+				t.Errorf("isToolNotFound = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSimilarTools(t *testing.T) {
+	tools := []client.ToolDefinition{
+		{Name: "list_snap_audiences"},
+		{Name: "list_snap_campaigns"},
+		{Name: "list_meta_campaigns"},
+		{Name: "get_snap_segment_details"},
+	}
+	got := similarTools(tools, "list_snap_segments", 3)
+	if len(got) == 0 {
+		t.Fatalf("expected suggestions, got none")
+	}
+	if got[0] != "list_snap_audiences" && got[0] != "list_snap_campaigns" {
+		t.Errorf("top suggestion should be a list_snap_* tool, got %q", got[0])
 	}
 }
 
