@@ -57,11 +57,24 @@ func (e *jsonRPCError) Error() string {
 	return fmt.Sprintf("MCP error %d: %s", e.Code, e.Message)
 }
 
+// ToolAnnotations carries the MCP tool behavior hints (spec 2025-06-18 / 2025-11-25).
+// All fields are HINTS that clients use for UX (confirmation prompts, grouping)
+// not enforcement. Spec defaults when unset: readOnlyHint=false,
+// destructiveHint=true, idempotentHint=false, openWorldHint=true.
+type ToolAnnotations struct {
+	Title           string `json:"title,omitempty"`
+	ReadOnlyHint    *bool  `json:"readOnlyHint,omitempty"`
+	DestructiveHint *bool  `json:"destructiveHint,omitempty"`
+	IdempotentHint  *bool  `json:"idempotentHint,omitempty"`
+	OpenWorldHint   *bool  `json:"openWorldHint,omitempty"`
+}
+
 // ToolDefinition represents a tool from tools/list.
 type ToolDefinition struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	InputSchema json.RawMessage `json:"inputSchema"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	InputSchema json.RawMessage  `json:"inputSchema"`
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
 }
 
 // ToolsListResult is the result of tools/list.
