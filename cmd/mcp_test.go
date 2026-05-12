@@ -164,6 +164,94 @@ func TestSimilarTools(t *testing.T) {
 	}
 }
 
+func TestToolCategoryLabel(t *testing.T) {
+	tr := true
+	fa := false
+
+	tests := []struct {
+		name string
+		a    *client.ToolAnnotations
+		want string
+	}{
+		{"nil annotations -> ?", nil, "?"},
+		{"readOnly", &client.ToolAnnotations{ReadOnlyHint: &tr}, "read"},
+		{"destructive (readOnly false)", &client.ToolAnnotations{
+			ReadOnlyHint: &fa, DestructiveHint: &tr, IdempotentHint: &fa,
+		}, "del"},
+		{"idempotent mutation", &client.ToolAnnotations{
+			ReadOnlyHint: &fa, DestructiveHint: &fa, IdempotentHint: &tr,
+		}, "idem"},
+		{"additive write", &client.ToolAnnotations{
+			ReadOnlyHint: &fa, DestructiveHint: &fa, IdempotentHint: &fa,
+		}, "write"},
+		{"empty annotations object (all hints absent) -> write", &client.ToolAnnotations{}, "write"},
+		{"readOnly wins over destructive flag", &client.ToolAnnotations{
+			ReadOnlyHint: &tr, DestructiveHint: &tr,
+		}, "read"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := toolCategoryLabel(tt.a); got != tt.want {
+				t.Errorf("toolCategoryLabel = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestToolDefinition_AnnotationsRoundTrip(t *testing.T) {
+	// Pretend we got this from a tools/list response on the wire and ensure
+	// it survives a marshal/unmarshal cycle — the cache writes back via
+	// json.Marshal, so we need annotations to persist.
+	raw := []byte(`{
+		"name": "get_snap_campaigns",
+		"description": "Read campaigns",
+		"inputSchema": {"type":"object","properties":{}},
+		"annotations": {"readOnlyHint": true, "openWorldHint": false}
+	}`)
+
+	var td client.ToolDefinition
+	if err := json.Unmarshal(raw, &td); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if td.Annotations == nil {
+		t.Fatalf("annotations were dropped")
+	}
+	if td.Annotations.ReadOnlyHint == nil || *td.Annotations.ReadOnlyHint != true {
+		t.Errorf("ReadOnlyHint = %v, want *true", td.Annotations.ReadOnlyHint)
+	}
+	if td.Annotations.OpenWorldHint == nil || *td.Annotations.OpenWorldHint != false {
+		t.Errorf("OpenWorldHint = %v, want *false", td.Annotations.OpenWorldHint)
+	}
+
+	// Marshal back and verify pointers serialize as bare booleans, not the
+	// stringly-typed shape Go can fall into with custom MarshalJSON.
+	out, err := json.Marshal(td)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !json.Valid(out) {
+		t.Fatalf("re-marshaled JSON is invalid: %s", out)
+	}
+	var back map[string]interface{}
+	if err := json.Unmarshal(out, &back); err != nil {
+		t.Fatalf("re-unmarshal: %v", err)
+	}
+	ann, ok := back["annotations"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("annotations missing after round trip: %s", out)
+	}
+	if ann["readOnlyHint"] != true {
+		t.Errorf("round-tripped readOnlyHint = %v, want true", ann["readOnlyHint"])
+	}
+	if ann["openWorldHint"] != false {
+		t.Errorf("round-tripped openWorldHint = %v, want false", ann["openWorldHint"])
+	}
+	// Fields we did not set must not appear at all (omitempty respected).
+	if _, present := ann["destructiveHint"]; present {
+		t.Errorf("destructiveHint should be omitted when unset")
+	}
+}
+
 func TestEmitJSONError_InJSONMode(t *testing.T) {
 	prev := mcpJSON
 	mcpJSON = true

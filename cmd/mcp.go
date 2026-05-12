@@ -116,6 +116,11 @@ func runMCPToolsList(cmd *cobra.Command, args []string) error {
 	if mcpToolsListVerbose {
 		for _, tool := range tools {
 			fmt.Printf("=== %s ===\n", tool.Name)
+			fmt.Printf("Category: %s\n", toolCategoryLabel(tool.Annotations))
+			if tool.Annotations != nil {
+				annJSON, _ := json.MarshalIndent(tool.Annotations, "", "  ")
+				fmt.Printf("Annotations:\n%s\n", string(annJSON))
+			}
 			fmt.Printf("Description:\n%s\n", tool.Description)
 			if len(tool.InputSchema) > 0 {
 				var schema interface{}
@@ -128,11 +133,34 @@ func runMCPToolsList(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		for _, tool := range tools {
-			fmt.Printf("%-40s %s\n", tool.Name, truncate(tool.Description, 80))
+			fmt.Printf("%-7s %-40s %s\n",
+				"["+toolCategoryLabel(tool.Annotations)+"]",
+				tool.Name,
+				truncate(tool.Description, 80))
 		}
 	}
 
 	return nil
+}
+
+// toolCategoryLabel returns a short tag describing a tool's behavior based on
+// its MCP annotations. Categories follow the MCP hint semantics; empty
+// annotations fall back to "?" because the spec defaults are pessimistic
+// (write + destructive) and we want that to be visible, not silent.
+func toolCategoryLabel(a *client.ToolAnnotations) string {
+	if a == nil {
+		return "?"
+	}
+	if a.ReadOnlyHint != nil && *a.ReadOnlyHint {
+		return "read"
+	}
+	if a.DestructiveHint != nil && *a.DestructiveHint {
+		return "del"
+	}
+	if a.IdempotentHint != nil && *a.IdempotentHint {
+		return "idem"
+	}
+	return "write"
 }
 
 func runMCPToolsCall(cmd *cobra.Command, args []string) error {
