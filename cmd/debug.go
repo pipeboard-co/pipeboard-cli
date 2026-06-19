@@ -97,8 +97,9 @@ func init() {
 
 	// TikTok Ads debug
 	debugTikTokAdsCmd.Flags().StringVar(&debugTikTokAdvertiserID, "advertiser-id", "", "TikTok advertiser ID (required)")
-	debugTikTokAdsCmd.Flags().StringVar(&debugTikTokEndpoint, "endpoint", "", "TikTok API endpoint path (required)")
-	debugTikTokAdsCmd.Flags().StringVar(&debugTikTokParams, "params", "{}", "JSON params for the request")
+	debugTikTokAdsCmd.Flags().StringVar(&debugTikTokEndpoint, "endpoint", "", "TikTok API endpoint path, e.g. /creative/portfolio/list/ or /ad/create/ (required)")
+	debugTikTokAdsCmd.Flags().StringVar(&debugTikTokMethod, "method", "GET", "HTTP method: GET or POST")
+	debugTikTokAdsCmd.Flags().StringVar(&debugTikTokParams, "params", "{}", "JSON params for the request (GET: query; POST: body)")
 	debugTikTokAdsCmd.MarkFlagRequired("advertiser-id")
 	debugTikTokAdsCmd.MarkFlagRequired("endpoint")
 	debugCmd.AddCommand(debugTikTokAdsCmd)
@@ -354,22 +355,60 @@ func runDebugGoogleAdsCall(cmd *cobra.Command, args []string) error {
 	return callGoogleAdsTool(debugGoogleToolName, toolArgs)
 }
 
-// --- TikTok Ads debug (placeholder - not yet implemented server-side) ---
+// --- TikTok Ads debug ---
 
 var debugTikTokAdsCmd = &cobra.Command{
 	Use:   "tiktok-ads",
 	Short: "Send raw API query to TikTok Ads API",
-	RunE:  runDebugTikTokAds,
+	Long: `Send a raw TikTok Marketing API request through Pipeboard (admin only).
+
+Returns TikTok's full envelope ({ code, message, request_id, data }) and never
+throws on a non-zero code, so you can iterate against opaque 40002s field-by-field.
+
+Examples:
+  pipeboard debug tiktok-ads --advertiser-id 123 --endpoint /creative/portfolio/get/ --params '{"creative_portfolio_id":"765..."}'
+  pipeboard debug tiktok-ads --advertiser-id 123 --endpoint /creative/portfolio/create/ --method POST --params '{"portfolio_type":"CALL_TO_ACTION","portfolio_content":[{"asset_content":"SHOP_NOW","asset_ids":["1"]}]}'`,
+	RunE: runDebugTikTokAds,
 }
 
 var (
 	debugTikTokAdvertiserID string
 	debugTikTokEndpoint     string
+	debugTikTokMethod       string
 	debugTikTokParams       string
 )
 
 func runDebugTikTokAds(cmd *cobra.Command, args []string) error {
-	return fmt.Errorf("not yet implemented server-side. Coming soon")
+	token, err := getToken()
+	if err != nil {
+		return err
+	}
+
+	// Parse optional params as arbitrary JSON — TikTok bodies nest arrays/objects
+	// (e.g. portfolio create, /ad/create/ creatives), so map[string]string is too narrow.
+	var params map[string]interface{}
+	if debugTikTokParams != "" && debugTikTokParams != "{}" {
+		if err := json.Unmarshal([]byte(debugTikTokParams), &params); err != nil {
+			return fmt.Errorf("invalid JSON in --params: %w", err)
+		}
+	}
+
+	body := map[string]interface{}{
+		"advertiser_id": debugTikTokAdvertiserID,
+		"endpoint":      debugTikTokEndpoint,
+		"method":        debugTikTokMethod,
+	}
+	if params != nil {
+		body["params"] = params
+	}
+
+	c := client.NewREST(getWebAPIURL(), token, Version)
+	result, err := c.Post("/api/debug/tiktok-ads", body)
+	if err != nil {
+		return fmt.Errorf("debug query failed: %w", err)
+	}
+
+	return printJSON(result)
 }
 
 func printJSON(v interface{}) error {
