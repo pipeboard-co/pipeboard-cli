@@ -140,6 +140,13 @@ func (p PropertySchema) resolveType() string {
 	return "string"
 }
 
+// propNameToFlagName maps a JSON Schema property name to its CLI flag name.
+// Both flag registration and argument building go through this, so the two can
+// never disagree about what a property's flag is called.
+func propNameToFlagName(propName string) string {
+	return strings.ReplaceAll(propName, "_", "-")
+}
+
 func buildToolCommand(server ServerConfig, tool client.ToolDefinition) *cobra.Command {
 	cmdName := toolNameToCommandName(tool.Name, server.ToolPrefix)
 
@@ -148,6 +155,24 @@ func buildToolCommand(server ServerConfig, tool client.ToolDefinition) *cobra.Co
 		_ = json.Unmarshal(tool.InputSchema, &schema)
 	}
 
+	cmd := &cobra.Command{
+		Use:   cmdName,
+		Short: truncate(tool.Description, 80),
+		Long:  tool.Description,
+	}
+
+	stringFlags, boolFlags := registerToolFlags(cmd, schema)
+
+	cmd.RunE = func(cmd *cobra.Command, args []string) error {
+		return runDynamicTool(cmd, server, tool.Name, schema, stringFlags, boolFlags)
+	}
+
+	return cmd
+}
+
+// registerToolFlags declares one flag per JSON Schema property and returns the
+// storage those flags parse into, keyed by property name.
+func registerToolFlags(cmd *cobra.Command, schema InputSchema) (map[string]*string, map[string]*bool) {
 	requiredSet := make(map[string]bool)
 	for _, r := range schema.Required {
 		requiredSet[r] = true
@@ -157,17 +182,8 @@ func buildToolCommand(server ServerConfig, tool client.ToolDefinition) *cobra.Co
 	stringFlags := make(map[string]*string)
 	boolFlags := make(map[string]*bool)
 
-	cmd := &cobra.Command{
-		Use:   cmdName,
-		Short: truncate(tool.Description, 80),
-		Long:  tool.Description,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runDynamicTool(server, tool.Name, schema, stringFlags, boolFlags)
-		},
-	}
-
 	for propName, prop := range schema.Properties {
-		flagName := strings.ReplaceAll(propName, "_", "-")
+		flagName := propNameToFlagName(propName)
 		desc := prop.Description
 		if len(prop.Enum) > 0 {
 			desc += " (options: " + strings.Join(prop.Enum, ", ") + ")"
@@ -186,10 +202,10 @@ func buildToolCommand(server ServerConfig, tool client.ToolDefinition) *cobra.Co
 		}
 	}
 
-	return cmd
+	return stringFlags, boolFlags
 }
 
-func runDynamicTool(server ServerConfig, toolName string, schema InputSchema, stringFlags map[string]*string, boolFlags map[string]*bool) error {
+func runDynamicTool(cmd *cobra.Command, server ServerConfig, toolName string, schema InputSchema, stringFlags map[string]*string, boolFlags map[string]*bool) error {
 	token, err := getToken()
 	if err != nil {
 		return err
@@ -202,7 +218,20 @@ func runDynamicTool(server ServerConfig, toolName string, schema InputSchema, st
 		return fmt.Errorf("handshake failed: %w", err)
 	}
 
-	// Build arguments from flag values, coercing types based on schema
+	toolArgs := buildToolArgs(cmd, schema, stringFlags, boolFlags)
+
+	fmt.Fprintf(os.Stderr, "Calling %s...\n", toolName)
+	result, err := c.CallTool(server.Path, toolName, toolArgs)
+	if err != nil {
+		return fmt.Errorf("tool call failed: %w", err)
+	}
+
+	return printToolResult(result)
+}
+
+// buildToolArgs turns parsed flag values into the tools/call arguments object,
+// coercing each one to the type its JSON Schema declares.
+func buildToolArgs(cmd *cobra.Command, schema InputSchema, stringFlags map[string]*string, boolFlags map[string]*bool) map[string]interface{} {
 	toolArgs := make(map[string]interface{})
 
 	for propName, val := range stringFlags {
@@ -235,19 +264,24 @@ func runDynamicTool(server ServerConfig, toolName string, schema InputSchema, st
 		}
 	}
 
+	// Send a boolean whenever the caller actually typed the flag, including
+	// `--flag=false`. Forwarding only `true` made an explicit false
+	// indistinguishable from omitting the flag, so any tool param whose
+	// server-side default is true could never be turned off — e.g.
+	// `delete_catalog_products --dry-run=false` stayed in dry run and could
+	// never execute, and `publish_facebook_page_post --published=false`
+	// silently published a post the caller asked to keep as a draft.
 	for propName, val := range boolFlags {
-		if val != nil && *val {
-			toolArgs[propName] = true
+		if val == nil {
+			continue
 		}
+		if cmd != nil && !cmd.Flags().Changed(propNameToFlagName(propName)) {
+			continue
+		}
+		toolArgs[propName] = *val
 	}
 
-	fmt.Fprintf(os.Stderr, "Calling %s...\n", toolName)
-	result, err := c.CallTool(server.Path, toolName, toolArgs)
-	if err != nil {
-		return fmt.Errorf("tool call failed: %w", err)
-	}
-
-	return printToolResult(result)
+	return toolArgs
 }
 
 // printToolResult extracts text content from the MCP tools/call response and prints it.

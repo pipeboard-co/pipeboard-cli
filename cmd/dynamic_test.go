@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/pipeboard-co/pipeboard-cli/internal/client"
+	"github.com/spf13/cobra"
 )
 
 func TestToolNameToCommandName(t *testing.T) {
@@ -169,4 +170,141 @@ func containsSubstr(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// parseToolArgs registers the schema's flags on a throwaway command, parses
+// argv through the same cobra machinery the real command uses, and returns the
+// arguments object that would be sent to tools/call.
+func parseToolArgs(t *testing.T, rawSchema string, argv ...string) map[string]interface{} {
+	t.Helper()
+
+	var schema InputSchema
+	if err := json.Unmarshal([]byte(rawSchema), &schema); err != nil {
+		t.Fatalf("unmarshal schema: %v", err)
+	}
+
+	cmd := &cobra.Command{Use: "test"}
+	stringFlags, boolFlags := registerToolFlags(cmd, schema)
+
+	if err := cmd.Flags().Parse(argv); err != nil {
+		t.Fatalf("parse %v: %v", argv, err)
+	}
+
+	return buildToolArgs(cmd, schema, stringFlags, boolFlags)
+}
+
+// A boolean the caller explicitly set to false must reach the server as false.
+// Sending only `true` made `--flag=false` indistinguishable from omitting the
+// flag, so any tool param whose server-side default is true could never be
+// turned off — delete_catalog_products could never leave dry run, and
+// publish_facebook_page_post --published=false published a post regardless.
+func TestBuildToolArgsBooleans(t *testing.T) {
+	schema := `{
+		"type": "object",
+		"properties": {
+			"catalog_id": {"type": "string"},
+			"dry_run": {"type": "boolean"},
+			"readback": {"type": "boolean"}
+		}
+	}`
+
+	tests := []struct {
+		name string
+		argv []string
+		want map[string]interface{}
+	}{
+		{
+			name: "explicit false is sent, not dropped",
+			argv: []string{"--catalog-id", "123", "--dry-run=false"},
+			want: map[string]interface{}{"catalog_id": "123", "dry_run": false},
+		},
+		{
+			name: "explicit true is sent",
+			argv: []string{"--dry-run=true"},
+			want: map[string]interface{}{"dry_run": true},
+		},
+		{
+			name: "bare flag means true",
+			argv: []string{"--dry-run"},
+			want: map[string]interface{}{"dry_run": true},
+		},
+		{
+			name: "unset booleans are omitted so the server default applies",
+			argv: []string{"--catalog-id", "123"},
+			want: map[string]interface{}{"catalog_id": "123"},
+		},
+		{
+			name: "each boolean is tracked independently",
+			argv: []string{"--dry-run=false"},
+			want: map[string]interface{}{"dry_run": false},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseToolArgs(t, schema, tc.argv...)
+			if len(got) != len(tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+			for k, want := range tc.want {
+				if got[k] != want {
+					t.Errorf("arg %q = %v (%T), want %v (%T)", k, got[k], got[k], want, want)
+				}
+			}
+		})
+	}
+}
+
+// Underscored properties are exposed as hyphenated flags; the change-tracking
+// lookup must use the same mapping or every boolean silently drops out again.
+func TestBuildToolArgsHyphenatedBooleanFlag(t *testing.T) {
+	schema := `{
+		"type": "object",
+		"properties": {"is_published": {"type": "boolean"}}
+	}`
+
+	got := parseToolArgs(t, schema, "--is-published=false")
+	if v, ok := got["is_published"]; !ok || v != false {
+		t.Errorf("is_published = %v (present=%v), want false", v, ok)
+	}
+}
+
+// Non-boolean flags keep their schema-declared types.
+func TestBuildToolArgsTypeCoercion(t *testing.T) {
+	schema := `{
+		"type": "object",
+		"properties": {
+			"name": {"type": "string"},
+			"limit": {"type": "integer"},
+			"ratio": {"type": "number"},
+			"product_ids": {"type": "array"},
+			"filter": {"type": "object"}
+		}
+	}`
+
+	got := parseToolArgs(t, schema,
+		"--name", "hello",
+		"--limit", "42",
+		"--ratio", "1.5",
+		"--product-ids", `["a","b"]`,
+		"--filter", `{"k":"v"}`,
+	)
+
+	if got["name"] != "hello" {
+		t.Errorf("name = %v, want hello", got["name"])
+	}
+	if got["limit"] != 42 {
+		t.Errorf("limit = %v (%T), want 42 (int)", got["limit"], got["limit"])
+	}
+	if got["ratio"] != 1.5 {
+		t.Errorf("ratio = %v (%T), want 1.5 (float64)", got["ratio"], got["ratio"])
+	}
+	ids, ok := got["product_ids"].([]interface{})
+	if !ok || len(ids) != 2 || ids[0] != "a" {
+		t.Errorf("product_ids = %v (%T), want [a b]", got["product_ids"], got["product_ids"])
+	}
+	filter, ok := got["filter"].(map[string]interface{})
+	if !ok || filter["k"] != "v" {
+		t.Errorf("filter = %v (%T), want map[k:v]", got["filter"], got["filter"])
+	}
 }
