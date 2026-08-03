@@ -116,6 +116,7 @@ func runMCPToolsList(cmd *cobra.Command, args []string) error {
 	if mcpToolsListVerbose {
 		for _, tool := range tools {
 			fmt.Printf("=== %s ===\n", tool.Name)
+			fmt.Printf("Title: %s\n", titleOrMissing(tool))
 			fmt.Printf("Category: %s\n", toolCategoryLabel(tool.Annotations))
 			if tool.Annotations != nil {
 				annJSON, _ := json.MarshalIndent(tool.Annotations, "", "  ")
@@ -133,14 +134,25 @@ func runMCPToolsList(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		for _, tool := range tools {
-			fmt.Printf("%-7s %-40s %s\n",
+			fmt.Printf("%-7s %-40s %-32s %s\n",
 				"["+toolCategoryLabel(tool.Annotations)+"]",
 				tool.Name,
-				truncate(tool.Description, 80))
+				truncate(titleOrMissing(tool), 32),
+				truncate(tool.Description, 60))
 		}
 	}
 
 	return nil
+}
+
+// titleOrMissing renders a tool's display title, or a loud placeholder when the
+// server sent none. A missing title is a blocking Claude Connectors submission
+// defect, so it gets called out rather than silently blank.
+func titleOrMissing(tool client.ToolDefinition) string {
+	if t := tool.DisplayTitle(); t != "" {
+		return t
+	}
+	return "(no title!)"
 }
 
 // toolCategoryLabel returns a short tag describing a tool's behavior based on

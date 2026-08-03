@@ -70,11 +70,35 @@ type ToolAnnotations struct {
 }
 
 // ToolDefinition represents a tool from tools/list.
+//
+// Title is the tool's human-readable display name. Note there are TWO places a
+// title can live: this top-level field (MCP spec 2025-06-18 onward, what
+// Pipeboard servers populate) and the legacy `annotations.title`. Without the
+// top-level field here, every tool decoded as untitled — including in `--json`
+// output and the on-disk tools cache, both of which re-marshal this struct — so
+// `tools-list` reported 0/63 titled against a server that returns 63/63.
 type ToolDefinition struct {
 	Name        string           `json:"name"`
+	Title       string           `json:"title,omitempty"`
 	Description string           `json:"description"`
 	InputSchema json.RawMessage  `json:"inputSchema"`
 	Annotations *ToolAnnotations `json:"annotations,omitempty"`
+}
+
+// DisplayTitle returns the tool's human-readable title, preferring the
+// top-level field and falling back to the legacy `annotations.title`. Empty
+// when the server sends neither — which for a Pipeboard server means a real
+// compliance gap (a title is a blocking Claude Connectors submission
+// requirement), so callers should show its absence rather than paper over it
+// with the machine name.
+func (t ToolDefinition) DisplayTitle() string {
+	if t.Title != "" {
+		return t.Title
+	}
+	if t.Annotations != nil {
+		return t.Annotations.Title
+	}
+	return ""
 }
 
 // ToolsListResult is the result of tools/list.
