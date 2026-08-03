@@ -276,3 +276,73 @@ func TestEmitJSONError_InJSONMode(t *testing.T) {
 		t.Errorf("error = %v, want EOF", got["error"])
 	}
 }
+
+func TestToolDefinition_TitleRoundTrip(t *testing.T) {
+	// A tools/list response as Pipeboard servers actually send it: `title` is a
+	// TOP-LEVEL field (MCP spec 2025-06-18), not `annotations.title`. Decoding
+	// used to drop it, so `tools-list` showed every tool as untitled and the
+	// on-disk cache persisted that — hence the round-trip assertion.
+	raw := []byte(`{
+		"name": "execute_google_ads_gaql_query",
+		"title": "Execute Google Ads GAQL Query",
+		"description": "Runs a GAQL query",
+		"inputSchema": {"type":"object","properties":{}},
+		"annotations": {"readOnlyHint": true}
+	}`)
+
+	var td client.ToolDefinition
+	if err := json.Unmarshal(raw, &td); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if td.Title != "Execute Google Ads GAQL Query" {
+		t.Fatalf("Title = %q, want the server's top-level title", td.Title)
+	}
+
+	out, err := json.Marshal(td)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var back map[string]interface{}
+	if err := json.Unmarshal(out, &back); err != nil {
+		t.Fatalf("re-unmarshal: %v", err)
+	}
+	if back["title"] != "Execute Google Ads GAQL Query" {
+		t.Errorf("re-marshaled title = %v, want it preserved for --json and the cache", back["title"])
+	}
+}
+
+func TestToolDisplayTitle(t *testing.T) {
+	tests := []struct {
+		name string
+		td   client.ToolDefinition
+		want string
+	}{
+		{"top-level title", client.ToolDefinition{Title: "Get Campaigns"}, "Get Campaigns"},
+		{"legacy annotations.title fallback", client.ToolDefinition{
+			Annotations: &client.ToolAnnotations{Title: "Get Campaigns"},
+		}, "Get Campaigns"},
+		{"top-level wins over annotations", client.ToolDefinition{
+			Title:       "Get Campaigns",
+			Annotations: &client.ToolAnnotations{Title: "Stale Legacy Title"},
+		}, "Get Campaigns"},
+		{"neither -> empty, never the machine name", client.ToolDefinition{Name: "get_campaigns"}, ""},
+		{"nil annotations", client.ToolDefinition{Name: "get_campaigns", Annotations: nil}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.td.DisplayTitle(); got != tt.want {
+				t.Errorf("DisplayTitle() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTitleOrMissing(t *testing.T) {
+	if got := titleOrMissing(client.ToolDefinition{Title: "Get Campaigns"}); got != "Get Campaigns" {
+		t.Errorf("titleOrMissing = %q, want the title", got)
+	}
+	// An untitled tool is a blocking submission defect — say so, don't render blank.
+	if got := titleOrMissing(client.ToolDefinition{Name: "get_campaigns"}); got != "(no title!)" {
+		t.Errorf("titleOrMissing = %q, want the missing-title placeholder", got)
+	}
+}
