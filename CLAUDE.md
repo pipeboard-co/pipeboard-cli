@@ -43,6 +43,10 @@ Token resolution order:
 1. `PIPEBOARD_API_TOKEN` env var
 2. `~/.pipeboard/config.json` token field
 
+`VERCEL_AUTOMATION_BYPASS_SECRET` (optional) is sent as `x-vercel-protection-bypass`
+on every request so `PIPEBOARD_API_URL` can target SSO-protected Vercel preview
+deployments. See `internal/client/headers.go`.
+
 ### Build-time variables
 
 Version and commit are injected via ldflags (see Makefile and .goreleaser.yml):
