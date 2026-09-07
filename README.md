@@ -51,6 +51,24 @@ Get your API token at [pipeboard.co/api-tokens](https://pipeboard.co/api-tokens)
 pipeboard login
 ```
 
+### Targeting a Vercel preview deployment
+
+`PIPEBOARD_API_URL` can point at any Pipeboard deployment, including a pull
+request's Vercel preview. Previews are protected by Vercel SSO, so set the
+project's [Protection Bypass for Automation](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation)
+secret and the CLI sends it as `x-vercel-protection-bypass` on every request:
+
+```bash
+export VERCEL_AUTOMATION_BYPASS_SECRET=...   # from the Vercel project settings
+export PIPEBOARD_API_URL=https://<deployment>.vercel.app
+pipeboard mcp --server meta-ads-mcp tools-list
+```
+
+Hosts without deployment protection ignore the header, so it is safe to leave
+set. Without it, a protected preview answers
+`HTTP 401 {"error":{"message":"Protected deployment"}}` before the app sees the
+request.
+
 ## Quick Start
 
 ```bash

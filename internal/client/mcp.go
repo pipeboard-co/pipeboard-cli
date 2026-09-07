@@ -178,8 +178,7 @@ func (c *Client) call(serverPath, method string, params interface{}) (json.RawMe
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+c.token)
-	httpReq.Header.Set("User-Agent", c.userAgent)
+	setCommonHeaders(httpReq, c.token, c.userAgent)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -215,13 +214,14 @@ type ToolsHashResult struct {
 
 // FetchToolsHash retrieves the combined tools hash from the server.
 // baseURL is the MCP base URL (e.g. https://mcp.pipeboard.co).
-// This endpoint requires no authentication.
+// This endpoint requires no authentication, but it still needs the Vercel
+// protection bypass when baseURL is a preview deployment.
 func FetchToolsHash(baseURL, version string) (*ToolsHashResult, error) {
 	req, err := http.NewRequest("GET", baseURL+"/api/tools-hash", nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
-	req.Header.Set("User-Agent", "pipeboard-cli/"+version)
+	setCommonHeaders(req, "", "pipeboard-cli/"+version)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -266,8 +266,7 @@ func (c *Client) notify(serverPath, method string, params interface{}) error {
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+c.token)
-	httpReq.Header.Set("User-Agent", c.userAgent)
+	setCommonHeaders(httpReq, c.token, c.userAgent)
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {

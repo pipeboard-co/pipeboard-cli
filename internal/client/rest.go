@@ -40,8 +40,7 @@ func (c *RESTClient) Post(path string, body interface{}) (map[string]interface{}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.token)
-	req.Header.Set("User-Agent", c.userAgent)
+	setCommonHeaders(req, c.token, c.userAgent)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
